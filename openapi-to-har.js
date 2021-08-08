@@ -44,7 +44,7 @@ const createHar = function (openApi, path, method, queryParamValues) {
     headers: getHeadersArray(openApi, path, method),
     queryString: getQueryStrings(openApi, path, method, queryParamValues),
     httpVersion: 'HTTP/1.1',
-    cookies: [],
+    cookies: getCookiesArray(openApi, path, method),
     headersSize: 0,
     bodySize: 0,
   };
@@ -415,6 +415,56 @@ const getHeadersArray = function (openApi, path, method) {
   }
 
   return headers;
+};
+
+/**
+ * Get an array of objects describing the cookie for a path and method pair
+ * described in the given OpenAPI document.
+ *
+ * @param  {Object} openApi OpenAPI document
+ * @param  {string} path    Key of the path
+ * @param  {string} method  Key of the method
+ * @return {array}          List of objects describing the header
+ */
+const getCookiesArray = function (openApi, path, method) {
+  const cookies = [];
+  const pathObj = openApi.paths[path][method];
+
+  let apiKeyAuthDef;
+  if (typeof pathObj.security !== 'undefined') {
+    for (var l in pathObj.security) {
+      const secScheme = Object.keys(pathObj.security[l])[0];
+      const secDefinition = openApi.securityDefinitions
+        ? openApi.securityDefinitions[secScheme]
+        : openApi.components.securitySchemes[secScheme];
+      const authType = secDefinition.type.toLowerCase();
+
+      if (authType == 'apikey' && secDefinition.in == 'cookie') {
+        apiKeyAuthDef = secDefinition;
+      }
+
+    }
+  } else if (typeof openApi.security !== 'undefined') {
+    // Need to check OAS 3.0 spec about type http and scheme
+    for (let m in openApi.security) {
+      const secScheme = Object.keys(openApi.security[m])[0];
+      const secDefinition = openApi.components.securitySchemes[secScheme];
+      const authType = secDefinition.type.toLowerCase();
+
+      if (authType == 'apikey' && secDefinition.in == 'cookie') {
+        apiKeyAuthDef = secDefinition;
+      }
+    }
+  }
+
+  if (apiKeyAuthDef) {
+      cookies.push({
+        name: apiKeyAuthDef.name,
+        value: 'REPLACE_KEY_VALUE',
+      });
+  }
+
+  return cookies;
 };
 
 /**
